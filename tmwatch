@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Time Machine Watchdog: read-only backup freshness check."""
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import subprocess
+import sys
+
+VERSION = "0.1.0"
+
+
+def tmutil(*args):
+    binary = os.environ.get("TMWATCH_TMUTIL", "tmutil")
+    try:
+        return subprocess.run([binary, *args], text=True, capture_output=True, timeout=20)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess([binary, *args], 127, "", str(exc))
+
+
+def field(text, name):
+    match = re.search(rf"^\s*{re.escape(name)}\s*:\s*(.+?)\s*$", text, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def backup_time(text, timezone):
+    matches = re.findall(r"(20\d{2})-(\d{2})-(\d{2})[-_](\d{2})(\d{2})(\d{2})", text)
+    if not matches:
+        return None
+    values = [dt.datetime(*map(int, item), tzinfo=timezone) for item in matches]
+    return max(values)
+
+
+def inspect(now, threshold_hours):
+    destination = tmutil("destinationinfo")
+    latest = tmutil("latestbackup")
+    status = tmutil("status")
+    destination_text = destination.stdout if destination.returncode == 0 else ""
+    latest_text = latest.stdout if latest.returncode == 0 else ""
+    destination_name = field(destination_text, "Name")
+    destination_kind = field(destination_text, "Kind")
+    stamp = backup_time(latest_text, now.astimezone().tzinfo)
+    age_hours = round((now - stamp).total_seconds() / 3600, 1) if stamp else None
+    running = field(status.stdout, "Running") == "1" if status.returncode == 0 else False
+
+    if destination.returncode != 0 or not (destination_name or destination_kind):
+        state, detail = "NO_DESTINATION", "No configured Time Machine destination was reported."
+    elif stamp is None:
+        state, detail = "NO_BACKUP", "No dated successful backup was reported."
+    elif age_hours > threshold_hours:
+        state, detail = "STALE", f"Latest reported backup is {age_hours:.1f} hours old."
+    else:
+        state, detail = "OK", f"Latest reported backup is {age_hours:.1f} hours old."
+
+    return {
+        "status": state,
+        "detail": detail,
+        "threshold_hours": threshold_hours,
+        "age_hours": age_hours,
+        "latest_backup_utc": stamp.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z") if stamp else None,
+        "destination_name": destination_name,
+        "destination_kind": destination_kind,
+        "backup_running": running,
+        "read_only": True,
+    }
+
+
+def render(report):
+    print(f"{report['status']}: {report['detail']}")
+    print(f"Destination: {report['destination_name'] or 'unavailable'} ({report['destination_kind'] or 'unknown kind'})")
+    print(f"Backup running now: {'yes' if report['backup_running'] else 'no/not reported'}")
+    print("Safety: read-only; no backup, destination, schedule, or notification was changed.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check Time Machine destination and latest-backup freshness without changing anything."
+    )
+    parser.add_argument("--threshold-hours", type=float, default=48.0, metavar="HOURS")
+    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    parser.add_argument("--version", action="version", version=f"Time Machine Watchdog {VERSION}")
+    args = parser.parse_args()
+    if args.threshold_hours <= 0:
+        parser.error("--threshold-hours must be greater than zero")
+    report = inspect(dt.datetime.now().astimezone(), args.threshold_hours)
+    if args.json:
+        json.dump(report, sys.stdout, indent=2)
+        print()
+    else:
+        render(report)
+    return 0 if report["status"] == "OK" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
