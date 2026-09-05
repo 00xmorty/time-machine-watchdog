@@ -19,6 +19,17 @@ The default stale threshold is 48 hours. Customize it or emit JSON:
 ./tmwatch --json
 ```
 
+Destination labels can contain names or other private context. Use the share-safe
+mode before pasting a report into an issue or chat:
+
+```sh
+./tmwatch --redact
+./tmwatch --redact --json
+```
+
+`--redact` replaces the destination name with `[redacted]` before output. It does
+not alter Time Machine or the destination itself.
+
 Exit code is `0` when the latest reported backup is within the threshold and `2` for stale, missing-backup, or missing-destination states, making the tool suitable for a user-managed scheduler or monitor.
 
 ## Safety
@@ -26,7 +37,7 @@ Exit code is `0` when the latest reported backup is within the threshold and `2`
 - Strictly read-only: only runs `tmutil destinationinfo`, `tmutil latestbackup`, and `tmutil status`.
 - Never starts, stops, deletes, repairs, configures, mounts, or changes a backup or destination.
 - No `sudo`, network requests, telemetry, persistence, or notifications.
-- Destination names can be personal. Review output before sharing it.
+- Destination names can be personal. Review output before sharing it, or use `--redact`.
 
 ## Limitations
 
@@ -35,6 +46,7 @@ Exit code is `0` when the latest reported backup is within the threshold and `2`
 - Time Machine output is not a stable API; an unknown timestamp format is reported as `NO_BACKUP` rather than guessed.
 - Backup path timestamps are interpreted in the Mac's current local timezone; changing timezones can introduce a timezone-sized age offset.
 - Network destination availability and free space are not independently probed.
+- Redaction covers the parsed destination name; it is not a general-purpose log scrubber.
 - This release does not install a LaunchAgent or send notifications. Scheduling is intentionally left to the user.
 
 ## Development

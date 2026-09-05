@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def tmutil(*args):
@@ -73,17 +73,33 @@ def render(report):
     print("Safety: read-only; no backup, destination, schedule, or notification was changed.")
 
 
+def redact(report):
+    """Return a share-safer copy without the destination label."""
+    safe = dict(report)
+    if safe["destination_name"]:
+        safe["destination_name"] = "[redacted]"
+    safe["redacted"] = True
+    return safe
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check Time Machine destination and latest-backup freshness without changing anything."
     )
     parser.add_argument("--threshold-hours", type=float, default=48.0, metavar="HOURS")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    parser.add_argument(
+        "--redact",
+        action="store_true",
+        help="replace the destination name with [redacted] before printing",
+    )
     parser.add_argument("--version", action="version", version=f"Time Machine Watchdog {VERSION}")
     args = parser.parse_args()
     if args.threshold_hours <= 0:
         parser.error("--threshold-hours must be greater than zero")
     report = inspect(dt.datetime.now().astimezone(), args.threshold_hours)
+    if args.redact:
+        report = redact(report)
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         print()

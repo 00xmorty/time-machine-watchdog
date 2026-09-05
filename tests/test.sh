@@ -30,6 +30,16 @@ assert r["read_only"] is True
 assert r["destination_name"] == "Test Backup"
 assert r["latest_backup_utc"] == "2020-01-01T00:00:00Z"
 PY
-python3 "$root/tmwatch" --version | grep -q '0.1.0'
 python3 "$root/tmwatch" --help | grep -q 'Time Machine destination'
-echo 'PASS: syntax, fresh/stale fixtures, JSON, safety, help/version'
+TZ=UTC TMWATCH_TMUTIL="$tmp/tmutil" python3 "$root/tmwatch" --threshold-hours 100000 --redact > "$tmp/redacted.txt"
+grep -q 'Destination: \[redacted\] (Local)' "$tmp/redacted.txt"
+! grep -q 'Test Backup' "$tmp/redacted.txt"
+TZ=UTC TMWATCH_TMUTIL="$tmp/tmutil" python3 "$root/tmwatch" --threshold-hours 100000 --redact --json > "$tmp/redacted.json"
+python3 - "$tmp/redacted.json" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+assert r["destination_name"] == "[redacted]"
+assert r["redacted"] is True
+PY
+python3 "$root/tmwatch" --version | grep -q '0.2.0'
+echo 'PASS: syntax, fresh/stale fixtures, JSON, redaction, safety, help/version'

@@ -1,3 +1,10 @@
+# v0.2.0
+
+- Adds `--redact` for share-safer text and JSON reports.
+- Replaces a parsed Time Machine destination label with `[redacted]` before output.
+- Adds deterministic tests proving the original destination name does not leak in redacted output.
+- Remains strictly read-only: no backup, destination, schedule, or notification changes.
+
 # v0.1.0
 
 Initial public release.
