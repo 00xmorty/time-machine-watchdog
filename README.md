@@ -30,7 +30,17 @@ mode before pasting a report into an issue or chat:
 `--redact` replaces the destination name with `[redacted]` before output. It does
 not alter Time Machine or the destination itself.
 
-Exit code is `0` when the latest reported backup is within the threshold and `2` for stale, missing-backup, or missing-destination states, making the tool suitable for a user-managed scheduler or monitor.
+Exit code is `0` when the latest reported backup is within the threshold and `2` for stale, missing-backup, missing-destination, or `UNKNOWN` states. Invalid CLI arguments also exit `2` (with an error on stderr, not a JSON report).
+
+### v0.3.0: uncertainty is not health
+
+Failed destination/latest-backup probes and future timestamps now report `UNKNOWN`,
+not a healthy backup or a definitive missing destination. `Running = 1;` from
+`tmutil status` is correctly recognized. JSON `backup_running` is now `true`,
+`false`, or `null` (unknown); consumers must handle the new nullable value.
+Status-probe failure alone does not invalidate independently observed freshness.
+Non-finite thresholds are rejected, invalid dates do not crash, and freshness
+uses exact seconds rather than the rounded display age.
 
 ## Safety
 
@@ -43,7 +53,7 @@ Exit code is `0` when the latest reported backup is within the threshold and `2`
 
 - macOS only for real checks; Linux CI exercises deterministic fixture data.
 - A recent timestamp is a health clue, not proof that every expected file is recoverable. Test restores separately.
-- Time Machine output is not a stable API; an unknown timestamp format is reported as `NO_BACKUP` rather than guessed.
+- Time Machine output is not a stable API; an unknown or invalid timestamp format in successful output is reported as `NO_BACKUP` rather than guessed. This is not proof that no backup exists.
 - Backup path timestamps are interpreted in the Mac's current local timezone; changing timezones can introduce a timezone-sized age offset.
 - Network destination availability and free space are not independently probed.
 - Redaction covers the parsed destination name; it is not a general-purpose log scrubber.
