@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 
 def tmutil(*args):
@@ -25,16 +25,22 @@ def field(text, name):
     return match.group(1) if match else None
 
 
-def backup_time(text, timezone):
+def backup_time(text):
     matches = re.findall(r"(20\d{2})-(\d{2})-(\d{2})[-_](\d{2})(\d{2})(\d{2})", text)
     if not matches:
         return None
     values = []
     for item in matches:
         try:
-            values.append(dt.datetime(*map(int, item), tzinfo=timezone))
+            wall = dt.datetime(*map(int, item))
         except ValueError:
             return None
+        # Resolve the offset at the backup date, not at the current date.
+        first = wall.replace(fold=0).astimezone()
+        second = wall.replace(fold=1).astimezone()
+        if first != second or first.replace(tzinfo=None) != wall:
+            raise ValueError("Backup local time is ambiguous or nonexistent at a clock transition.")
+        values.append(first)
     return max(values)
 
 
@@ -46,13 +52,19 @@ def inspect(now, threshold_hours):
     latest_text = latest.stdout if latest.returncode == 0 else ""
     destination_name = field(destination_text, "Name")
     destination_kind = field(destination_text, "Kind")
-    stamp = backup_time(latest_text, now.astimezone().tzinfo)
+    time_error = None
+    try:
+        stamp = backup_time(latest_text)
+    except ValueError as exc:
+        stamp, time_error = None, str(exc)
     age_hours = round((now - stamp).total_seconds() / 3600, 1) if stamp else None
     running_match = re.search(r"^\s*Running\s*[=:]\s*([01])\s*;?\s*$", status.stdout, re.MULTILINE)
     running = bool(int(running_match[1])) if status.returncode == 0 and running_match else None
 
     if destination.returncode != 0 or latest.returncode != 0:
         state, detail = "UNKNOWN", "A required tmutil probe failed; backup health cannot be determined."
+    elif time_error:
+        state, detail = "UNKNOWN", time_error
     elif not (destination_name or destination_kind):
         state, detail = "NO_DESTINATION", "No configured Time Machine destination was reported."
     elif stamp is None:

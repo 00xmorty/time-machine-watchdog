@@ -41,6 +41,6 @@ r = json.load(open(sys.argv[1], encoding="utf-8"))
 assert r["destination_name"] == "[redacted]"
 assert r["redacted"] is True
 PY
-python3 "$root/tmwatch" --version | grep -q '0.3.0'
+python3 "$root/tmwatch" --version | grep -q '0.3.1'
 TZ=UTC python3 -m unittest discover -s "$root/tests" -p 'test_*.py' -v
 echo 'PASS: syntax, fresh/stale fixtures, JSON, redaction, safety, help/version'

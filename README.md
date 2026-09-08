@@ -32,6 +32,14 @@ not alter Time Machine or the destination itself.
 
 Exit code is `0` when the latest reported backup is within the threshold and `2` for stale, missing-backup, missing-destination, or `UNKNOWN` states. Invalid CLI arguments also exit `2` (with an error on stderr, not a JSON report).
 
+### v0.3.1: historical daylight-saving time
+
+Backup timestamps now use the local timezone offset at the backup date, not
+today's offset. A spring transition can represent 23 elapsed hours between
+two local noons, not 24. Ambiguous repeated times and nonexistent skipped times
+report `UNKNOWN` with null age/timestamp instead of guessing backup freshness.
+No new probes, dependencies, or JSON fields are introduced.
+
 ### v0.3.0: uncertainty is not health
 
 Failed destination/latest-backup probes and future timestamps now report `UNKNOWN`,
@@ -54,7 +62,7 @@ uses exact seconds rather than the rounded display age.
 - macOS only for real checks; Linux CI exercises deterministic fixture data.
 - A recent timestamp is a health clue, not proof that every expected file is recoverable. Test restores separately.
 - Time Machine output is not a stable API; an unknown or invalid timestamp format in successful output is reported as `NO_BACKUP` rather than guessed. This is not proof that no backup exists.
-- Backup path timestamps are interpreted in the Mac's current local timezone; changing timezones can introduce a timezone-sized age offset.
+- Backup path timestamps use the Mac's current timezone rules at the backup date (including historical daylight-saving offsets). The path does not identify the original timezone: travel or timezone changes can still introduce an age offset. Ambiguous/nonexistent clock-transition times report `UNKNOWN`.
 - Network destination availability and free space are not independently probed.
 - Redaction covers the parsed destination name; it is not a general-purpose log scrubber.
 - This release does not install a LaunchAgent or send notifications. Scheduling is intentionally left to the user.

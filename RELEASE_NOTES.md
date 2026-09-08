@@ -1,3 +1,12 @@
+# v0.3.1
+
+- Fix historical daylight-saving offsets when interpreting backup path timestamps.
+- Calculate freshness correctly across seasonal clock transitions.
+- Report ambiguous/nonexistent local timestamps as UNKNOWN with null age and UTC timestamp.
+- Add five deterministic Europe/Berlin regressions; 17 unit tests total plus CLI smoke tests.
+- No new dependencies, probes, JSON fields, system changes, or telemetry.
+- Original backup timezone cannot be recovered from an offset-free path; timezone changes remain a limitation.
+
 # v0.3.0
 
 - Correctly parse tmutil's Running = 1; assignment syntax.
